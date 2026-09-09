@@ -3,26 +3,58 @@ import gi
 from .screen_dimensions import calculate_window_size
 
 gi.require_version('Gtk', '4.0')
-from gi.repository import Gtk
+gi.require_version('Gdk', '4.0')
+from gi.repository import Gtk, Gdk, GLib, Pango
 
 class ClipboardWindow(Gtk.ApplicationWindow):
   def __init__(self, **kwargs):
     super().__init__(**kwargs, title='')
 
+class ClipboardEntry(Gtk.ListBoxRow):
+  def __init__(self, content = '', **kwargs):
+      super().__init__(**kwargs)
+
+      self.content = content
+
+      row = Gtk.Box(spacing=12, margin_start=8)
+      label = Gtk.Label(label=content, hexpand=True, xalign=0, ellipsize=Pango.EllipsizeMode.END, single_line_mode=True)
+
+      delete_button = Gtk.Button(icon_name='user-trash-symbolic')
+      delete_button.connect('clicked', self.on_delete)
+
+      row.append(label)
+      row.append(delete_button)
+
+      self.set_child(row)
+
+  def on_delete(self, _widget):
+    listbox = self.get_parent()
+
+    if isinstance(listbox, Gtk.ListBox):
+      listbox.remove(self)
+      
+
 class Application(Gtk.Application):
   def __init__(self, *args, **kwargs):
     super().__init__(*args, application_id='com.clipboard.history', **kwargs)
     self.window = None
-    self.rows = []
+    self.rows = None
+    self.clipboard = None
 
   def clear_all(self, _widget):
-    pass
+    assert self.rows is not None
+    self.rows.remove_all()
 
   def do_activate(self):
     if not self.window:
       self.window = ClipboardWindow(application=self)
       self.window.set_resizable(False)
       self.window.set_default_size(*calculate_window_size(self.window.get_display()))
+      self.rows = Gtk.ListBox()
+      display = Gdk.Display.get_default()
+
+      assert display is not None
+      self.clipboard = display.get_clipboard()
 
       header_bar = Gtk.HeaderBar()
       header_bar.set_decoration_layout("icon:close")
@@ -38,5 +70,39 @@ class Application(Gtk.Application):
 
       header_bar.pack_start(label)
       header_bar.pack_end(clear_button)
+    
+      scrollable_panel.set_child(self.rows)
+
+      self.rows.connect('row-activated', self.handle_row_click)
+
+      self.timeout_id = GLib.timeout_add(500, self.read_clipboard)
+      
 
     self.window.present()
+
+  def handle_row_click(self, _listbox: Gtk.ListBox, row: ClipboardEntry):
+    assert self.clipboard is not None
+    self.clipboard.set(row.content)
+
+  def read_clipboard(self):
+    assert self.clipboard is not None
+    self.clipboard.read_text_async(None, self.on_read_text)      
+
+    return True
+
+  def on_read_text(self, _clipboard, result):
+    assert self.clipboard is not None
+    assert self.rows is not None
+
+    text = self.clipboard.read_text_finish(result)
+
+    if text is None:
+      return
+
+    first = self.rows.get_first_child()
+
+    if isinstance(first, ClipboardEntry) and first.content == text:
+      return
+
+    self.rows.prepend(ClipboardEntry(content=text))
+
