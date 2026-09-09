@@ -40,6 +40,7 @@ class Application(Gtk.Application):
     self.window = None
     self.rows = None
     self.clipboard = None
+    self.ignore_next_change = False
 
   def clear_all(self, _widget):
     assert self.rows is not None
@@ -55,6 +56,7 @@ class Application(Gtk.Application):
 
       assert display is not None
       self.clipboard = display.get_clipboard()
+      self.clipboard.connect('changed', self.on_clipboard_changed)
 
       header_bar = Gtk.HeaderBar()
       header_bar.set_decoration_layout("icon:close")
@@ -75,16 +77,18 @@ class Application(Gtk.Application):
 
       self.rows.connect('row-activated', self.handle_row_click)
 
-      self.timeout_id = GLib.timeout_add(500, self.read_clipboard)
-      
-
     self.window.present()
 
   def handle_row_click(self, _listbox: Gtk.ListBox, row: ClipboardEntry):
     assert self.clipboard is not None
+    self.ignore_next_change = True
     self.clipboard.set(row.content)
 
-  def read_clipboard(self):
+  def on_clipboard_changed(self, _clipboard):
+    if self.ignore_next_change:
+      self.ignore_next_change = False
+      return
+    
     assert self.clipboard is not None
     self.clipboard.read_text_async(None, self.on_read_text)      
 
@@ -97,11 +101,6 @@ class Application(Gtk.Application):
     text = self.clipboard.read_text_finish(result)
 
     if text is None:
-      return
-
-    first = self.rows.get_first_child()
-
-    if isinstance(first, ClipboardEntry) and first.content == text:
       return
 
     self.rows.prepend(ClipboardEntry(content=text))
