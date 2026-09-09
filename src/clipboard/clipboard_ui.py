@@ -97,6 +97,7 @@ class Application(Gtk.Application):
 
     self.rows.connect('row-activated', self.handle_row_click)
     self.window.connect('close-request', self.handle_close_request)
+    self.window.connect('notify::is-active', self.handle_active_change)
 
   def do_activate(self):
     if not self.window:
@@ -124,6 +125,10 @@ class Application(Gtk.Application):
     self.window.hide()
 
     return True
+
+  def handle_active_change(self, window: Gtk.Window, _param):
+    if not window.is_active():
+      window.hide()
 
   def on_clipboard_changed(self, _clipboard):
     if self.ignore_next_change:
