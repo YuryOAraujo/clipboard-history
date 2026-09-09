@@ -102,8 +102,6 @@ class Application(Gtk.Application):
   def do_activate(self):
     if not self.window:
       self.create_window()
-      assert self.window is not None
-      self.window.present()
       return
 
     self.window.hide() if self.window.get_visible() else self.window.present()
