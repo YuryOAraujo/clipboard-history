@@ -4,26 +4,43 @@ from .screen_dimensions import calculate_window_size
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
-from gi.repository import Gtk, Gdk, GLib, Pango
+from gi.repository import Gtk, Gdk, Pango
+from typing import Literal
+
 
 class ClipboardWindow(Gtk.ApplicationWindow):
   def __init__(self, **kwargs):
     super().__init__(**kwargs, title='')
 
 class ClipboardEntry(Gtk.ListBoxRow):
-  def __init__(self, content = '', type = '', **kwargs):
+  def __init__(self, content: str | Gdk.Texture, type: Literal['text', 'image'], **kwargs):
       super().__init__(**kwargs)
 
       self.content = content
       self.type = type
 
-      row = Gtk.Box(spacing=12, margin_start=8)
-      label = Gtk.Label(label=content, hexpand=True, xalign=0, ellipsize=Pango.EllipsizeMode.END, single_line_mode=True)
+      row = Gtk.Box(spacing=12, margin_start=8, margin_bottom=8, margin_top=8, margin_end=8, valign=Gtk.Align.START)
+      
+      if type == 'text' and isinstance(content, str):
+        label = Gtk.Label(label=content, hexpand=True, xalign=0, ellipsize=Pango.EllipsizeMode.END, single_line_mode=True)
+        row.append(label)
+      elif type == 'image' and isinstance(self.content, Gdk.Texture):
+        preview = Gtk.Box(hexpand=True)
 
-      delete_button = Gtk.Button(icon_name='user-trash-symbolic')
+        picture = Gtk.Picture()
+        picture.set_paintable(self.content)
+        picture.set_content_fit(Gtk.ContentFit.CONTAIN)
+        picture.set_can_shrink(True)
+        picture.set_size_request(160, 100)
+        picture.set_halign(Gtk.Align.START)
+        picture.set_valign(Gtk.Align.CENTER)
+
+        preview.append(picture)
+        row.append(preview)
+
+      delete_button = Gtk.Button(icon_name='user-trash-symbolic', valign=Gtk.Align.START)
       delete_button.connect('clicked', self.on_delete)
 
-      row.append(label)
       row.append(delete_button)
 
       self.set_child(row)
@@ -83,7 +100,13 @@ class Application(Gtk.Application):
   def handle_row_click(self, _listbox: Gtk.ListBox, row: ClipboardEntry):
     assert self.clipboard is not None
     self.ignore_next_change = True
-    self.clipboard.set(row.content)
+    if row.type == 'text':
+      self.clipboard.set(row.content)
+    elif row.type =='image':
+      assert isinstance(row.content, Gdk.Texture)
+      gbytes = row.content.save_to_png_bytes()
+      content = Gdk.ContentProvider.new_for_bytes("image/png", gbytes)
+      self.clipboard.set_content(content)
 
   def on_clipboard_changed(self, _clipboard):
     if self.ignore_next_change:
@@ -94,7 +117,7 @@ class Application(Gtk.Application):
     formats = self.clipboard.get_formats().get_mime_types()
 
     if formats and any(mime.startswith('image/') for mime in formats):
-      pass
+      self.clipboard.read_texture_async(None, self.on_read_texture)
     elif formats and any(mime.startswith('text/') for mime in formats):
       self.clipboard.read_text_async(None, self.on_read_text)      
 
@@ -109,3 +132,13 @@ class Application(Gtk.Application):
 
     self.rows.prepend(ClipboardEntry(content=text, type='text'))
 
+  def on_read_texture(self, _clipboard, result):
+    assert self.clipboard is not None
+    assert self.rows is not None
+
+    texture = self.clipboard.read_texture_finish(result)
+
+    if texture is None:
+      return
+
+    self.rows.prepend(ClipboardEntry(content=texture, type='image'))   
