@@ -11,10 +11,11 @@ class ClipboardWindow(Gtk.ApplicationWindow):
     super().__init__(**kwargs, title='')
 
 class ClipboardEntry(Gtk.ListBoxRow):
-  def __init__(self, content = '', **kwargs):
+  def __init__(self, content = '', type = '', **kwargs):
       super().__init__(**kwargs)
 
       self.content = content
+      self.type = type
 
       row = Gtk.Box(spacing=12, margin_start=8)
       label = Gtk.Label(label=content, hexpand=True, xalign=0, ellipsize=Pango.EllipsizeMode.END, single_line_mode=True)
@@ -88,11 +89,14 @@ class Application(Gtk.Application):
     if self.ignore_next_change:
       self.ignore_next_change = False
       return
-    
-    assert self.clipboard is not None
-    self.clipboard.read_text_async(None, self.on_read_text)      
 
-    return True
+    assert self.clipboard is not None
+    formats = self.clipboard.get_formats().get_mime_types()
+
+    if formats and any(mime.startswith('image/') for mime in formats):
+      pass
+    elif formats and any(mime.startswith('text/') for mime in formats):
+      self.clipboard.read_text_async(None, self.on_read_text)      
 
   def on_read_text(self, _clipboard, result):
     assert self.clipboard is not None
@@ -103,5 +107,5 @@ class Application(Gtk.Application):
     if text is None:
       return
 
-    self.rows.prepend(ClipboardEntry(content=text))
+    self.rows.prepend(ClipboardEntry(content=text, type='text'))
 
