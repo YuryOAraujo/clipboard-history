@@ -1,3 +1,5 @@
+import hashlib
+
 import gi
 
 from .screen_dimensions import calculate_window_size
@@ -100,6 +102,7 @@ class Application(Gtk.Application):
   def handle_row_click(self, _listbox: Gtk.ListBox, row: ClipboardEntry):
     assert self.clipboard is not None
     self.ignore_next_change = True
+    
     if row.type == 'text':
       self.clipboard.set(row.content)
     elif row.type =='image':
@@ -126,8 +129,12 @@ class Application(Gtk.Application):
     assert self.rows is not None
 
     text = self.clipboard.read_text_finish(result)
-
+    
     if text is None:
+      return
+
+    first = self.rows.get_first_child()
+    if isinstance(first, ClipboardEntry) and first.type == 'text' and text == first.content:
       return
 
     self.rows.prepend(ClipboardEntry(content=text, type='text'))
@@ -140,5 +147,14 @@ class Application(Gtk.Application):
 
     if texture is None:
       return
+    
+    first = self.rows.get_first_child()
+    if isinstance(first, ClipboardEntry) and first.type == 'image' and isinstance(first.content, Gdk.Texture) and self.texture_hash(first.content) == self.texture_hash(texture):
+        return
 
-    self.rows.prepend(ClipboardEntry(content=texture, type='image'))   
+    self.rows.prepend(ClipboardEntry(content=texture, type='image'))
+
+  def texture_hash(self, texture: Gdk.Texture):
+    data = texture.save_to_png_bytes().get_data()
+    assert data is not None
+    return hashlib.sha256(data).digest()
