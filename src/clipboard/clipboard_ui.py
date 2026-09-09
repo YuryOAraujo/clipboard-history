@@ -66,38 +66,46 @@ class Application(Gtk.Application):
     assert self.rows is not None
     self.rows.remove_all()
 
+  def create_window(self):
+    self.window = ClipboardWindow(application=self)
+    self.window.set_resizable(False)
+    self.window.set_default_size(*calculate_window_size(self.window.get_display()))
+    self.rows = Gtk.ListBox()
+    display = Gdk.Display.get_default()
+
+    assert display is not None
+    self.clipboard = display.get_clipboard()
+    self.clipboard.connect('changed', self.on_clipboard_changed)
+
+    header_bar = Gtk.HeaderBar()
+    header_bar.set_decoration_layout("icon:close")
+    
+    self.window.set_titlebar(header_bar)
+    self.hold()
+
+    scrollable_panel = Gtk.ScrolledWindow(margin_bottom=6, margin_end=12, margin_start=12, margin_top=6)
+    self.window.set_child(scrollable_panel)
+
+    label = Gtk.Label(label='Clipboard', hexpand=True, xalign=0.10)
+    clear_button = Gtk.Button(label='Clear All')
+    clear_button.connect('clicked', self.clear_all)
+
+    header_bar.pack_start(label)
+    header_bar.pack_end(clear_button)
+  
+    scrollable_panel.set_child(self.rows)
+
+    self.rows.connect('row-activated', self.handle_row_click)
+    self.window.connect('close-request', self.handle_close_request)
+
   def do_activate(self):
     if not self.window:
-      self.window = ClipboardWindow(application=self)
-      self.window.set_resizable(False)
-      self.window.set_default_size(*calculate_window_size(self.window.get_display()))
-      self.rows = Gtk.ListBox()
-      display = Gdk.Display.get_default()
+      self.create_window()
+      assert self.window is not None
+      self.window.present()
+      return
 
-      assert display is not None
-      self.clipboard = display.get_clipboard()
-      self.clipboard.connect('changed', self.on_clipboard_changed)
-
-      header_bar = Gtk.HeaderBar()
-      header_bar.set_decoration_layout("icon:close")
-      
-      self.window.set_titlebar(header_bar)
-
-      scrollable_panel = Gtk.ScrolledWindow(margin_bottom=6, margin_end=12, margin_start=12, margin_top=6)
-      self.window.set_child(scrollable_panel)
-
-      label = Gtk.Label(label='Clipboard', hexpand=True, xalign=0.10)
-      clear_button = Gtk.Button(label='Clear All')
-      clear_button.connect('clicked', self.clear_all)
-
-      header_bar.pack_start(label)
-      header_bar.pack_end(clear_button)
-    
-      scrollable_panel.set_child(self.rows)
-
-      self.rows.connect('row-activated', self.handle_row_click)
-
-    self.window.present()
+    self.window.hide() if self.window.get_visible() else self.window.present()
 
   def handle_row_click(self, _listbox: Gtk.ListBox, row: ClipboardEntry):
     assert self.clipboard is not None
@@ -110,6 +118,12 @@ class Application(Gtk.Application):
       gbytes = row.content.save_to_png_bytes()
       content = Gdk.ContentProvider.new_for_bytes("image/png", gbytes)
       self.clipboard.set_content(content)
+
+  def handle_close_request(self, _widget):
+    assert self.window is not None
+    self.window.hide()
+
+    return True
 
   def on_clipboard_changed(self, _clipboard):
     if self.ignore_next_change:
