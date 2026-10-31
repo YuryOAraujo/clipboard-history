@@ -1,5 +1,7 @@
 # Clipboard History
 
+<img width="614" height="464" alt="image" src="https://github.com/user-attachments/assets/81a76079-c92d-4387-be1c-0ee914b273cc" />
+
 A small GTK 4 clipboard history popup for Linux. Text and PNG images survive
 closing the popup and restarting the application. Clicking an entry copies it,
 closes the popup, and sends Ctrl+V after focus returns to the previous app.
