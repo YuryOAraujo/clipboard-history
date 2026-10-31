@@ -7,7 +7,10 @@ def calculate_window_size(display: Gdk.Display) -> tuple[int, int]:
   monitors = display.get_monitors()
   monitor = monitors.get_item(0)
 
-  screen_width = monitor.get_geometry().width # type: ignore
-  screen_height = monitor.get_geometry().height # type: ignore
+  if monitor is None:
+    return 576, 432
+
+  screen_width = monitor.get_geometry().width
+  screen_height = monitor.get_geometry().height
 
   return round(min(screen_width * 0.30, 576)), round(min(screen_height * 0.4, 432))
