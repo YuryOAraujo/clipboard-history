@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Clipboard History
+Comment=View and reuse clipboard history
+Exec=/path_example/clipboard-history/.venv/bin/python -m clipboard
+Path=/path_example/clipboard-history/src
+Terminal=false
+Type=Application
+Categories=Utility;

@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "A GTK clipboard history application."
 readme = "README.md"
 requires-python = ">=3.11"
+dependencies = ["PyGObject>=3.42"]
 
 [project.scripts]
 clipboard-history = "clipboard.__main__:main"
